@@ -1,76 +1,215 @@
-<!DOCTYPE html>
-<html lang="es" class="h-full bg-gray-50">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'FinFlow') — 50·30·20</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
-</head>
-<body class="h-full font-sans antialiased">
-<div class="flex h-full">
+# FinFlow — 50·30·20 Personal Finance App
+## PHP 8.3 · Laravel 11 · Fortify + Sanctum · MFA · SQLite / MariaDB
 
-    <aside class="w-60 bg-gray-900 flex flex-col shrink-0 fixed inset-y-0 left-0 z-40">
-        <div class="px-5 py-6 border-b border-gray-800">
-            <span class="text-2xl font-black text-white tracking-tight">Fin<span class="text-red-500">Flow</span></span>
-            <div class="mt-1 text-xs text-gray-500 font-mono">50 · 30 · 20</div>
-        </div>
-        <div class="mx-3 mt-3 px-3 py-2 bg-gray-800 rounded-lg">
-            <div class="text-xs text-gray-500 font-mono uppercase tracking-widest">Sesión</div>
-            <div class="text-sm font-semibold text-gray-200 mt-0.5">{{ auth()->user()->name }}</div>
-            @if(auth()->user()->isAdmin())
-                <div class="mt-1 inline-block text-xs px-2 py-0.5 bg-red-900/50 text-red-400 rounded">Administrador</div>
-            @endif
-        </div>
-        <nav class="flex-1 px-3 py-4 overflow-y-auto">
-            @if(auth()->user()->isAdmin())
-                <div class="text-xs text-gray-600 font-mono uppercase tracking-widest px-2 pt-2 pb-1">Admin</div>
-                <x-nav-link href="{{ route('admin.dashboard') }}"   :active="request()->routeIs('admin.dashboard')">📊 Resumen</x-nav-link>
-                <x-nav-link href="{{ route('admin.clients.index') }}" :active="request()->routeIs('admin.clients.*')">👥 Clientes</x-nav-link>
-                <x-nav-link href="{{ route('admin.logs.index') }}"   :active="request()->routeIs('admin.logs.*')">📋 Audit Logs</x-nav-link>
-                <x-nav-link href="{{ route('admin.settings.index') }}" :active="request()->routeIs('admin.settings.*')">⚙️ Configuración</x-nav-link>
-            @else
-                <div class="text-xs text-gray-600 font-mono uppercase tracking-widest px-2 pt-2 pb-1">Principal</div>
-                <x-nav-link href="{{ route('dashboard') }}"           :active="request()->routeIs('dashboard')">📊 Dashboard</x-nav-link>
-                <x-nav-link href="{{ route('transactions.index') }}"  :active="request()->routeIs('transactions.*')">💳 Transacciones</x-nav-link>
-                <x-nav-link href="{{ route('income.index') }}"        :active="request()->routeIs('income.*')">💵 Mis Ingresos</x-nav-link>
-                <x-nav-link href="{{ route('goals.index') }}"         :active="request()->routeIs('goals.*')">🎯 Metas de Ahorro</x-nav-link>
-            @endif
-        </nav>
-        <div class="border-t border-gray-800 p-3">
-            <form method="POST" action="{{ route('logout') }}">
-                @csrf
-                <button type="submit" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-800 hover:text-gray-300 text-sm font-medium transition-colors">
-                    🚪 Cerrar sesión
-                </button>
-            </form>
-        </div>
-    </aside>
+---
 
-    <div class="flex-1 ml-60 flex flex-col min-h-screen">
-        <header class="bg-white border-b border-gray-200 flex items-center justify-between px-7 py-4 sticky top-0 z-30">
-            <h1 class="text-base font-bold text-gray-900">@yield('page-title', 'Dashboard')</h1>
-            <div class="flex items-center gap-3">
-                @yield('topbar-actions')
-                <span class="text-xs font-mono text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg">{{ now()->translatedFormat('F Y') }}</span>
-            </div>
-        </header>
+## 📁 Project Structure
 
-        @if(session('success'))
-        <div class="mx-7 mt-5 flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-200 text-green-800 rounded-xl text-sm">
-            ✅ {{ session('success') }}
-        </div>
-        @endif
-        @if(session('error') || $errors->any())
-        <div class="mx-7 mt-5 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
-            ⚠️ {{ session('error') ?? $errors->first() }}
-        </div>
-        @endif
+```
+finflow/
+├── app/
+│   ├── Http/
+│   │   ├── Controllers/
+│   │   │   ├── DashboardController.php       ← Consumer dashboard
+│   │   │   ├── TransactionController.php     ← Add/edit/delete expenses & income
+│   │   │   ├── IncomeController.php          ← Manage income sources
+│   │   │   ├── SavingsGoalController.php     ← Savings goals
+│   │   │   └── Admin/
+│   │   │       ├── DashboardController.php   ← Admin overview + stats
+│   │   │       └── UserController.php        ← Create/manage client accounts
+│   │   ├── Middleware/
+│   │   │   ├── EnsureAdmin.php               ← Blocks non-admins from /admin
+│   │   │   ├── EnsureMfaVerified.php         ← Enforces 2FA session
+│   │   │   ├── EnsureAccountActive.php       ← Blocks deactivated accounts
+│   │   │   └── LogActivity.php               ← Auto-logs write actions
+│   │   └── Requests/                         ← Form validation (StoreTransactionRequest etc.)
+│   ├── Models/
+│   │   ├── User.php                          ← Sanctum + TwoFactorAuthenticatable
+│   │   ├── Transaction.php                   ← expense | income
+│   │   ├── IncomeSource.php                  ← monthly/weekly/annual income
+│   │   ├── Budget.php                        ← Monthly 50/30/20 snapshot
+│   │   ├── SavingsGoal.php                   ← Savings targets
+│   │   └── AuditLog.php                      ← Activity log
+│   ├── Services/
+│   │   └── BudgetService.php                 ← Core 50/30/20 calculation engine
+│   ├── Notifications/
+│   │   ├── BudgetExceededNotification.php    ← Email alert when limit exceeded
+│   │   └── WelcomeNotification.php           ← Sent by admin when creating account
+│   └── Policies/                             ← Authorization (who owns what)
+├── database/
+│   ├── migrations/                           ← All 5 table schemas
+│   └── seeders/DatabaseSeeder.php            ← Admin + 6 sample consumers
+├── resources/views/
+│   ├── layouts/app.blade.php                 ← Sidebar shell
+│   ├── dashboard/index.blade.php             ← Consumer dashboard + charts
+│   ├── components/transaction-modal.blade.php← Add expense/income modal
+│   └── admin/
+│       └── clients/
+│           ├── index.blade.php               ← Client list + create modal
+│           └── show.blade.php                ← Client detail + charts
+├── routes/web.php                            ← All routes with middleware groups
+├── config/fortify.php                        ← MFA + rate limiting config
+├── .env.example                              ← SQLite (default) or MariaDB
+└── composer.json                             ← All dependencies
+```
 
-        <main class="flex-1 p-7">@yield('content')</main>
-    </div>
-</div>
-@stack('scripts')
-</body>
-</html>
+---
+
+## 🚀 Quick Start
+
+### 1. Install Laravel & dependencies
+
+```bash
+composer create-project laravel/laravel finflow
+cd finflow
+
+# Auth + MFA packages
+composer require laravel/sanctum laravel/fortify
+composer require pragmarx/google2fa-laravel bacon/bacon-qr-code
+
+# Admin panel (Filament)
+composer require filament/filament
+
+# Dev tools
+composer require --dev laravel/telescope
+```
+
+### 2. Copy project files into place
+Copy all files from this archive into your `finflow/` directory.
+
+### 3. Configure environment
+
+```bash
+cp .env.example .env
+php artisan key:generate
+
+# SQLite (prototype - default, no extra setup needed)
+touch database/database.sqlite
+
+# MariaDB (production) — edit .env:
+# DB_CONNECTION=mysql
+# DB_HOST=127.0.0.1
+# DB_DATABASE=finflow_db
+# DB_USERNAME=finflow_user
+# DB_PASSWORD=your_password
+```
+
+### 4. Publish & configure Fortify
+
+```bash
+php artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
+# This creates config/fortify.php and app/Actions/Fortify/
+```
+
+### 5. Run migrations + seed
+
+```bash
+php artisan migrate
+php artisan db:seed
+
+# Seeded accounts:
+# Admin:    admin@finflow.com   / Admin1234!
+# Consumer: maria@email.com    / User1234!
+# Consumer: carlos@email.com   / User1234!
+# (+ 4 more sample users)
+```
+
+### 6. Install Filament admin panel
+
+```bash
+php artisan filament:install --panels
+php artisan make:filament-user
+# → Use: admin@finflow.com / Admin1234!
+```
+
+### 7. Install & build frontend assets
+
+```bash
+npm install
+npm install -D tailwindcss @tailwindcss/forms autoprefixer
+npx tailwindcss init -p
+npm run dev
+```
+
+### 8. Start dev server
+
+```bash
+php artisan serve
+# → http://localhost:8000
+```
+
+---
+
+## 🔐 Authentication Flow
+
+```
+User visits /          →  redirected to /login (if not auth)
+POST /login            →  validate email + password
+                           └── if MFA enabled → redirect to /two-factor-challenge
+POST /two-factor-challenge → validate TOTP code (pragmarx/google2fa)
+                              └── session: mfa_verified = true
+                              └── issue Sanctum token
+                              └── redirect to dashboard
+
+Admin visits /admin    →  middleware: auth + verified + ensure.mfa + admin
+Consumer visits /      →  middleware: auth + verified + ensure.mfa + ensure.active
+```
+
+---
+
+## 📊 50/30/20 Engine (BudgetService)
+
+```php
+$service = app(BudgetService::class);
+
+// Get limits
+$limits = $service->calculate(4500.00);
+// → ['needs' => 2250.00, 'wants' => 1350.00, 'savings' => 900.00]
+
+// Full dashboard summary
+$summary = $service->getDashboardSummary($user, '2026-03');
+// → income, balance, spent per category, progress %, alerts
+
+// 6-month trend
+$trend = $service->getSpendingTrend($user, 6);
+```
+
+---
+
+## 🗄️ Key Artisan Commands
+
+```bash
+# Run migrations fresh + reseed
+php artisan migrate:fresh --seed
+
+# Clear all caches
+php artisan optimize:clear
+
+# Queue worker (for email notifications)
+php artisan queue:work
+
+# Telescope (dev debugging)
+php artisan telescope:install
+php artisan migrate
+
+# Run tests
+php artisan test
+```
+
+---
+
+## 🌐 Route Summary
+
+| Method | URI | Middleware | Action |
+|--------|-----|------------|--------|
+| GET | / | auth, mfa | Dashboard |
+| GET/POST | /transactions | auth, mfa | List / Create |
+| PUT/DELETE | /transactions/{id} | auth, mfa, policy | Update / Delete |
+| POST | /transactions/import-csv | auth, mfa | CSV Import |
+| GET/POST | /income | auth, mfa | Income sources |
+| GET/POST | /goals | auth, mfa | Savings goals |
+| GET | /admin | auth, mfa, admin | Admin dashboard |
+| GET | /admin/clients | auth, mfa, admin | Client list |
+| POST | /admin/clients | auth, mfa, admin | Create client account |
+| GET | /admin/clients/{id} | auth, mfa, admin | Client detail + charts |
+| PATCH | /admin/clients/{id}/toggle-status | auth, mfa, admin | Activate/deactivate |
